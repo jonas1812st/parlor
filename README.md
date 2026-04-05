@@ -1,5 +1,7 @@
 # Parlor
 
+> **Research preview** — this is an early experiment. Expect rough edges, bugs, and latency quirks. Feedback and contributions welcome.
+
 On-device, real-time multimodal AI. Have natural voice and vision conversations with an AI that runs entirely on your machine — nothing leaves your device.
 
 Parlor pairs [Gemma 4 E2B](https://huggingface.co/google/gemma-4-E2B-it) (2.3B effective parameters, native audio + vision) with [Kokoro](https://huggingface.co/hexgrad/Kokoro-82M) TTS for fluid, spoken conversations. You talk, show your camera, and it talks back — all locally.
