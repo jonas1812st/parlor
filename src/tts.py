@@ -1,16 +1,11 @@
 """Platform-aware Kokoro TTS: mlx-audio on Apple Silicon, kokoro-onnx elsewhere."""
 
+import os
 import platform
 import sys
-import urllib.request
 from pathlib import Path
 
 import numpy as np
-
-KOKORO_ONNX_FILES = {
-    "kokoro-v1.0.onnx": "https://github.com/hexgrad/Kokoro-82M/releases/download/v1.0/kokoro-v1.0.onnx",
-    "voices-v1.0.bin": "https://github.com/hexgrad/Kokoro-82M/releases/download/v1.0/voices-v1.0.bin",
-}
 
 
 def _is_apple_silicon() -> bool:
@@ -47,18 +42,12 @@ class ONNXBackend(TTSBackend):
 
     def __init__(self):
         import kokoro_onnx
+        from huggingface_hub import hf_hub_download
 
-        tts_dir = Path(__file__).parent
-        for filename, url in KOKORO_ONNX_FILES.items():
-            path = tts_dir / filename
-            if not path.exists():
-                print(f"Downloading {filename}...")
-                urllib.request.urlretrieve(url, path)
+        model_path = hf_hub_download("fastrtc/kokoro-onnx", "kokoro-v1.0.onnx")
+        voices_path = hf_hub_download("fastrtc/kokoro-onnx", "voices-v1.0.bin")
 
-        self._model = kokoro_onnx.Kokoro(
-            str(tts_dir / "kokoro-v1.0.onnx"),
-            str(tts_dir / "voices-v1.0.bin"),
-        )
+        self._model = kokoro_onnx.Kokoro(model_path, voices_path)
         self.sample_rate = 24000
 
     def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
@@ -68,7 +57,7 @@ class ONNXBackend(TTSBackend):
 
 def load() -> TTSBackend:
     """Load the best available TTS backend for this platform."""
-    if _is_apple_silicon():
+    if _is_apple_silicon() and not os.environ.get("KOKORO_ONNX"):
         try:
             backend = MLXBackend()
             print(f"TTS: mlx-audio (Apple GPU, sample_rate={backend.sample_rate})")
