@@ -17,7 +17,9 @@ class TTSBackend:
 
     sample_rate: int = 24000
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
+    def generate(
+        self, text: str, voice: str = "af_heart", speed: float = 1.1
+    ) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -32,9 +34,12 @@ class MLXBackend(TTSBackend):
         # Warmup: triggers pipeline init (phonemizer, spacy, etc.)
         list(self._model.generate(text="Hello", voice="af_heart", speed=1.0))
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
-        results = list(self._model.generate(text=text, voice=voice, speed=speed))
-        return np.concatenate([np.array(r.audio) for r in results])
+
+def generate(
+    self, text: str, voice: str = "af_heart", speed: float = 1.1
+) -> np.ndarray:
+    results = list(self._model.generate(text=text, voice=voice, speed=speed))
+    return np.concatenate([np.array(r.audio) for r in results])
 
 
 class ONNXBackend(TTSBackend):
@@ -50,7 +55,9 @@ class ONNXBackend(TTSBackend):
         self._model = kokoro_onnx.Kokoro(model_path, voices_path)
         self.sample_rate = 24000
 
-    def generate(self, text: str, voice: str = "af_heart", speed: float = 1.1) -> np.ndarray:
+    def generate(
+        self, text: str, voice: str = "af_heart", speed: float = 1.1
+    ) -> np.ndarray:
         pcm, _sr = self._model.create(text, voice=voice, speed=speed)
         return pcm
 

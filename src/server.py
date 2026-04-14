@@ -8,9 +8,8 @@ import re
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from engine import LlamaChatEngine
+from chat_engine import LlamaChatEngine
 
-import litert_lm
 import numpy as np
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
