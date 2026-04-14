@@ -14,5 +14,7 @@ dependencies = [
     "soundfile>=0.13.1",
     "uvicorn[standard]>=0.43.0",
     "websockets>=16.0",
-		"requests>=2.33.1"
+    "requests>=2.33.1",
+    "sounddevice>=0.5.3",
+    "pyttsx3>=2.99",
 ]
