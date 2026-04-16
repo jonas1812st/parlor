@@ -63,17 +63,17 @@ class LlamaChatEngine:
     def __init__(
         self,
         server_url=os.environ.get("LLAMA_SERVER_URL", "127.0.0.1:8080"),
-        system_prompt="Du bist ein hilfreicher KI-Assistent.",
+        system_prompt="You are a helpful AI assistant.",
         model_name=os.environ.get(
             "MODEL_NAME",
-            "ggml-org/gemma-4-E2B-it-GGUF",  # Name ist meist egal beim llama.cpp server
+            "ggml-org/gemma-4-E2B-it-GGUF",  # Name usually does not matter for llama.cpp server
         ),
         tools=[],
         save_messages: bool = True,  # TODO: Make to options object to specify more options of the engine
         choose_tool: Literal["respond_to_user", "translate_audio"] = "respond_to_user",
     ):
         """
-        Initialisiert die Chat-Engine und legt den System-Prompt fest.
+        Initializes the chat engine and sets the system prompt.
         """
         self.server_url = server_url
         self.endpoint = f"{self.server_url}/v1/chat/completions"
@@ -83,17 +83,17 @@ class LlamaChatEngine:
         self.messages: list[dict[str, str | list[dict]]] = []
         self.save_messages = save_messages
         self.choose_tool = choose_tool
-        self.reset_chat()  # Setzt den Chatverlauf initial auf (inkl. System-Prompt)
+        self.reset_chat()  # Initialize chat history (including system prompt)
 
     def reset_chat(self):
-        """Löscht den bisherigen Verlauf und startet neu mit dem System-Prompt."""
+        """Clears previous history and restarts with the system prompt."""
         self.messages = [{"role": "system", "content": self.system_prompt}]
-        print("--- Chatverlauf wurde zurückgesetzt ---")
+        print("--- Chat history has been reset ---")
 
     def _encode_audio(self, audio_path):
-        """Hilfsfunktion: Liest Audio ein und wandelt es in Base64 um."""
+        """Helper function: reads audio and converts it to Base64."""
         if not os.path.exists(audio_path):
-            raise FileNotFoundError(f"Die Datei '{audio_path}' wurde nicht gefunden.")
+            raise FileNotFoundError(f"The file '{audio_path}' was not found.")
 
         with open(audio_path, "rb") as audio_file:
             base64_audio = base64.b64encode(audio_file.read()).decode("utf-8")
@@ -106,20 +106,20 @@ class LlamaChatEngine:
 
     def send_message(self, text=None, audio_path=None, temperature=0.4):
         """
-        Fügt die neue Nachricht (Text und/oder Audio) dem Verlauf hinzu,
-        sendet den gesamten Verlauf an die API und speichert die Antwort.
+        Adds the new message (text and/or audio) to history,
+        sends full history to the API, and stores the response.
         """
         if not text and not audio_path:
-            return "Fehler: Es muss entweder Text oder Audio übergeben werden."
+            return "Error: Either text or audio must be provided."
 
-        # 1. Inhalt der neuen Benutzernachricht zusammenbauen
+        # 1. Build content for the new user message
         message_content: list[dict[str, str | dict]] = []
 
-        # Falls Text vorhanden ist, hinzufügen
+        # If text is provided, append it
         if text:
             message_content.append({"type": "text", "text": text})
 
-        # Falls Audio vorhanden ist, verarbeiten und hinzufügen
+        # If audio is provided, process and append it
         if audio_path:
             try:
                 b64_audio, a_format = self._encode_audio(audio_path)
@@ -133,16 +133,16 @@ class LlamaChatEngine:
                 message_content.append(
                     {
                         "type": "text",
-                        "text": "Der Benutzer hat gerade mit dir gesprochen (Audio). Antworte darauf, was er sagt.",
+                        "text": "The user just spoke to you (audio). Respond to what they said.",
                     }
                 )
             except Exception as e:
-                return f"Audio-Fehler: {e}"
+                return f"Audio error: {e}"
 
-        # 2. Nachricht an unseren lokalen Verlauf anhängen
+        # 2. Append message to local history
         self.messages.append({"role": "user", "content": message_content})
 
-        # 3. Payload für den Server erstellen (mit gesamtem Verlauf)
+        # 3. Build payload for the server (with full history)
         payload = json.dumps(
             {
                 "model": self.model_name,
@@ -162,7 +162,7 @@ class LlamaChatEngine:
         )
         headers = {"Content-Type": "application/json"}
 
-        # 4. API Request senden
+        # 4. Send API request
         try:
             response = requests.request(
                 "POST", url=self.endpoint, headers=headers, data=payload
@@ -171,14 +171,14 @@ class LlamaChatEngine:
 
             result_json = response.json()
 
-            # Die exakte Antwort des Assistenten extrahieren
+            # Extract assistant's exact response
             assistant_message = result_json["choices"][0]["message"]
 
-            # 5. Die Antwort des Servers an unseren Verlauf anhängen!
-            # Dadurch "erinnert" sich das Modell bei der nächsten Frage an seine eigene Antwort.
+            # 5. Append server response to history!
+            # This lets the model "remember" its own response in the next turn.
             self.messages.append(assistant_message)
 
-            # Prüfen, ob das Modell das Tool aufgerufen hat
+            # Check whether the model called a tool
             if "tool_calls" in assistant_message and assistant_message["tool_calls"]:
                 tool_call = assistant_message["tool_calls"][0]
                 tool_name = tool_call["function"]["name"]
@@ -187,26 +187,26 @@ class LlamaChatEngine:
                 try:
                     parsed_args = json.loads(arguments_string)
 
-                    # Logik je nach aufgerufenem Tool:
+                    # Logic based on called tool:
                     if tool_name == "translate_audio":
                         print(
-                            f"\n[Tool gewählt: Übersetzung ins {parsed_args.get('target_language')}]"
+                            f"\n[Tool chosen: translation to {parsed_args.get('target_language')}]"
                         )
-                        # Wir wandeln es für die Sprachausgabe so um, dass es einheitlich bleibt
+                        # Convert to unified format for speech output
                         return {
                             "transcription": parsed_args.get("transcription"),
-                            "response": f"Die Übersetzung lautet: {parsed_args.get('translation')}",
+                            "response": f"The translation is: {parsed_args.get('translation')}",
                         }
 
                     elif tool_name == "respond_to_user":
                         return (
-                            parsed_args  # Gibt einfach transcription & response zurück
+                            parsed_args  # Return transcription & response directly
                         )
 
                 except json.JSONDecodeError:
                     return {
-                        "transcription": "Fehler",
-                        "response": "Konnte das JSON der KI nicht parsen.",
+                        "transcription": "Error",
+                        "response": "Could not parse the AI JSON.",
                     }
 
             if (
@@ -214,11 +214,11 @@ class LlamaChatEngine:
             ):  # Reset chat if message history should not be saved
                 self.reset_chat()
 
-            # Fallback, falls das Modell (warum auch immer) normalen Text schickt
-            return assistant_message.get("content", "Keine Antwort und kein Tool-Call.")
+            # Fallback if the model sends regular text for any reason
+            return assistant_message.get("content", "No response and no tool call.")
 
         except requests.exceptions.RequestException as e:
-            # Bei einem Verbindungsfehler entfernen wir unsere letzte Nachricht wieder,
-            # damit wir es noch einmal versuchen können, ohne den Chatverlauf zu vergiften.
+            # On connection error, remove last message
+            # so we can retry without polluting chat history.
             self.messages.pop()
-            return f"API-Kommunikationsfehler: {e}\nDetails: {getattr(e.args[0], 'text', 'Keine Details')}"
+            return f"API communication error: {e}\nDetails: {getattr(e.args[0], 'text', 'No details')}"
