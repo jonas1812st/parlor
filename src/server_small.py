@@ -71,8 +71,8 @@ async def root():
 @app.post("/chat/message")
 async def process_audio_message(audio_file: UploadFile = File(...)):
     """
-    Nimmt eine Audiodatei entgegen, leitet sie an die LlamaChatEngine weiter
-    und gibt die Transkription sowie die Modell-Antwort als JSON zurück.
+    Receives an audio file, forwards it to the LlamaChatEngine,
+    and returns the transcription and model response as JSON.
     """
 
     if not engine:
@@ -86,40 +86,38 @@ async def process_audio_message(audio_file: UploadFile = File(...)):
             status_code=400, detail="Bad Request. Please provide a valid audio file."
         )
 
-    # 1. Dateiendung prüfen (optional, aber empfohlen für Fallbacks)
+    # 1. Check file extension (optional, but recommended for fallbacks)
     file_extension = (
         audio_file.filename.split(".")[-1].lower()
         if "." in audio_file.filename
         else "wav"
     )
 
-    # 2. Temporäre Datei erstellen, um sie an die Engine zu übergeben
+    # 2. Create temporary file so it can be passed to the engine
     temp_fd, temp_path = tempfile.mkstemp(suffix=f".{file_extension}")
-    os.close(temp_fd)  # Wir schließen den File-Deskriptor sofort, da wir shutil nutzen
+    os.close(temp_fd)  # Close descriptor immediately because we use shutil
 
     try:
-        # 3. Den Upload-Stream in die temporäre Datei kopieren
+        # 3. Copy upload stream into the temporary file
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(audio_file.file, buffer)
 
-        # 4. Die gespeicherte Datei an unsere Llama-Engine verfüttern
-        print(f"Verarbeite Audio: {audio_file.filename} ...")
+        # 4. Feed the saved file to our Llama engine
+        print(f"Processing audio: {audio_file.filename} ...")
         result = engine.send_message(audio_path=temp_path)
 
-        # 5. Fehlerbehandlung, falls die Engine einen String (Error) statt einem Dict zurückgibt
-        if isinstance(result, str) and result.startswith(
-            ("Fehler", "API-Kommunikationsfehler")
-        ):
+        # 5. Handle errors if engine returns a string instead of a dict
+        if isinstance(result, str) and result.startswith(("Error", "API communication error")):
             raise HTTPException(status_code=500, detail=result)
 
-        # 6. Erfolgreiches Ergebnis zurückgeben (FastAPI wandelt das Dict automatisch in JSON um)
+        # 6. Return successful result (FastAPI converts dict to JSON automatically)
         return JSONResponse(content=result)
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Interner Serverfehler: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
     finally:
-        # 7. Aufräumen: Temporäre Datei immer löschen, egal ob Erfolg oder Fehler
+        # 7. Cleanup: always delete temp file, whether success or failure
         if os.path.exists(temp_path):
             os.remove(temp_path)
 
